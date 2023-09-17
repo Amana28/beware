@@ -37,26 +37,39 @@ def home():
 def first_map():
     return render_template('location.html', autocomplete_src = autocomplete_src, values = Report.query.all())
 
+
 @app.route("/bewaremap", methods=['POST', 'GET'])
 def beware_map():
-    address = request.form["location"]
-    params = {
-        'key': os.getenv('API_KEY'),
-        'address': address
-    }
-    base_url = 'https://maps.googleapis.com/maps/api/geocode/json?'
-    response = requests.get(base_url, params=params)
-    data = response.json()
-    if data['status'] == 'OK':
-        result = data['results'][0]
-        location = result['geometry']['location']
-        global LAT 
-        LAT = location['lat']
-        global LNG 
-        LNG = location['lng']
-    else:
-        return "address is invalid"
-    return render_template('bewaremap.html', latitude = LAT, longitude = LNG, map_src = map_src, values = Report.query.all()) 
+    if request.method == 'POST':
+        address = request.form.get("location")
+
+        if not address:
+            return "Address is missing in the form data"
+
+        api_key = os.getenv('API_KEY')
+        if not api_key:
+            return "API key is missing or invalid"
+
+        params = {
+            'key': api_key,
+            'address': address
+        }
+        
+        base_url = 'https://maps.googleapis.com/maps/api/geocode/json'
+        response = requests.get(base_url, params=params)
+        data = response.json()
+
+        if data['status'] == 'OK':
+            result = data['results'][0]
+            location = result['geometry']['location']
+            lat = location['lat']
+            lng = location['lng']
+            return render_template('bewaremap.html', latitude=lat, longitude=lng, map_src=map_src, values=Report.query.all())
+        else:
+            print("Geocoding API Error:", data['status'])
+            return "Invalid address"
+
+    return render_template('bewaremap.html')
 
 @app.route("/bewaremaplight")
 def beware_map_light():
@@ -259,4 +272,7 @@ def other_dark():
 
 if __name__ == '__main__': 
     configure()
+    # Create the Flask app and database inside the main script
+    app.app_context().push()  # Push an application context
+    db.create_all()  # Initialize the database
     app.run(debug=True, host="0.0.0.0")
